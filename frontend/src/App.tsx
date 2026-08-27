@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { engineRoot } from "./api/sudoku";
 import { CellComponent } from "./components/Cell";
 import { useGrid } from "./hooks/grid";
@@ -21,6 +21,9 @@ const INITIAL_VALUES: CellValue[][] = [
 const INITIAL_GRID = createGrid(INITIAL_VALUES, true);
 
 function App() {
+	const [allowInvalidMoves, setAllowInvalidMoves] = useState<boolean>(true);
+	const [showInvalidMoves, setShowInvalidMoves] = useState<boolean>(true);
+
 	// Check backend
 	useEffect(() => {
 		async function checkBackend() {
@@ -31,7 +34,10 @@ function App() {
 		checkBackend();
 	}, []);
 
-	const { grid, updateCell, toggleCandidate } = useGrid(INITIAL_GRID);
+	const { grid, moveError, updateCell, toggleCandidate } = useGrid(
+		INITIAL_GRID,
+		allowInvalidMoves,
+	);
 
 	const inputRefs = useRef<(HTMLInputElement | null)[][]>(
 		Array.from({ length: 9 }, () => Array(9).fill(null)),
@@ -45,25 +51,106 @@ function App() {
 	const focusCell = useCallback((row: number, col: number) => {
 		inputRefs.current[row]?.[col]?.focus();
 	}, []);
-
 	return (
 		<section className="px-8">
 			<h1>SudoQ</h1>
-			<div className="@container mt-2 grid grid-cols-9 w-full max-w-3xl mx-auto border-8 border-(--outer-border)">
-				{grid.map((row, rowIndex) =>
-					row.map((cell, colIndex) => (
-						<CellComponent
-							key={`r${rowIndex}c${colIndex}`}
-							row={rowIndex}
-							col={colIndex}
-							cell={cell}
-							updateCell={updateCell}
-							toggleCandidate={toggleCandidate}
-							focusCell={focusCell}
-							setInputRef={setInputRef}
-						/>
-					)),
-				)}
+
+			<div className="mx-auto flex max-w-5xl flex-col items-center gap-2 lg:flex-row lg:items-start lg:justify-center lg:gap-12">
+				<div className="@container w-full max-w-2xl">
+					<div className="grid w-full grid-cols-9 border-8 border-(--outer-border)">
+						{grid.map((row, rowIndex) =>
+							row.map((cell, colIndex) => (
+								<CellComponent
+									key={`r${rowIndex}c${colIndex}`}
+									row={rowIndex}
+									col={colIndex}
+									cell={cell}
+									isConflicting={
+										(showInvalidMoves &&
+											moveError?.cells.some(
+												(cell) =>
+													cell.rowIndex === rowIndex &&
+													cell.colIndex === colIndex,
+											)) ??
+										false
+									}
+									updateCell={updateCell}
+									toggleCandidate={toggleCandidate}
+									focusCell={focusCell}
+									setInputRef={setInputRef}
+								/>
+							)),
+						)}
+					</div>
+					{moveError && showInvalidMoves && (
+						<p className="text-red-700">
+							{moveError.message}, les cellules en conflit ont été surlignées
+						</p>
+					)}
+				</div>
+				<aside className="w-full max-w-56 border-(--border) pt-8">
+					<div className="flex flex-col gap-6">
+						<div className="flex flex-col gap-1.5">
+							<label
+								htmlFor="validation-mode"
+								className="text-sm text-(--text-h) font-semibold"
+							>
+								Validation
+							</label>
+
+							<select
+								id="validation-mode"
+								className="w-full border-b border-(--border) bg-transparent py-1.5 text-sm text-(--text) outline-none focus:border-(--accent)"
+								value={
+									!allowInvalidMoves
+										? "strict"
+										: showInvalidMoves
+											? "assist"
+											: "free"
+								}
+								onChange={(e) => {
+									switch (e.target.value) {
+										case "strict":
+											setAllowInvalidMoves(false);
+											setShowInvalidMoves(true);
+											break;
+
+										case "assist":
+											setAllowInvalidMoves(true);
+											setShowInvalidMoves(true);
+											break;
+
+										case "free":
+											setAllowInvalidMoves(true);
+											setShowInvalidMoves(false);
+											break;
+									}
+								}}
+							>
+								<option value="strict">Bloquer les erreurs</option>
+								<option value="assist" defaultChecked>
+									Signaler les erreurs
+								</option>
+								<option value="free">Aucune aide</option>
+							</select>
+						</div>
+
+						{/* <div className="flex flex-col gap-1.5">
+							<label htmlFor="difficulty" className="text-sm text-(--text-h)">
+								Difficulté
+							</label>
+
+							<select
+								id="difficulty"
+								className="w-full border-b border-(--border) bg-transparent py-1.5 text-sm text-(--text) outline-none focus:border-(--accent)"
+							>
+								<option value="easy">Facile</option>
+								<option value="medium">Moyen</option>
+								<option value="hard">Difficile</option>
+							</select>
+						</div> */}
+					</div>
+				</aside>
 			</div>
 		</section>
 	);

@@ -8,6 +8,7 @@ type CellProps = {
 	cell: Cell;
 	row: number;
 	col: number;
+	isConflicting: boolean;
 	updateCell: (options: UpdateCellOptions) => void;
 	toggleCandidate: (options: ToggleCandidateOptions) => void;
 	focusCell: (row: number, col: number) => void;
@@ -22,6 +23,7 @@ export const CellComponent = memo(function CellComponent({
 	cell,
 	row,
 	col,
+	isConflicting,
 	updateCell,
 	toggleCandidate,
 	focusCell,
@@ -36,8 +38,9 @@ export const CellComponent = memo(function CellComponent({
 	return (
 		<div
 			className={clsx(
-				"relative aspect-square border border-(--border) text-(--text) flex justify-center items-center",
+				"relative flex aspect-square items-center justify-center border border-(--border) text-(--text)",
 				"has-focus:border-(--accent-border) has-focus:border-4",
+				isConflicting && "bg-(--accent)/30",
 				(row === 2 || row === 5) && "border-b-4",
 				(col === 2 || col === 5) && "border-r-4",
 				col === 0 && "border-l-0",
@@ -77,7 +80,8 @@ export const CellComponent = memo(function CellComponent({
 				}}
 				className={clsx(
 					"w-full h-full border-none outline-none bg-transparent text-center text-[4cqw]",
-					cell.isInitialValue && "font-bold text-black",
+					cell.isInitialValue && "font-bold",
+					isConflicting && "text-(--accent)",
 				)}
 				onKeyDown={(e) => {
 					// Only triggered when input is focused
