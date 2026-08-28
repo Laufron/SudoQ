@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CellValue, Digit, Grid } from "../types/grid";
-import { isValidMove } from "../lib/rules";
-import type { MoveError } from "../types/rules";
+import { getGridConflicts, isValidMove } from "../lib/rules";
 
 export type UpdateCellOptions = {
 	rowIndex: number;
@@ -17,7 +16,9 @@ export type ToggleCandidateOptions = {
 
 export function useGrid(initialGrid: Grid, allowInvalidMoves: boolean) {
 	const [grid, setGrid] = useState<Grid>(initialGrid);
-	const [moveError, setMoveError] = useState<MoveError | null>(null);
+	const [lastMoveError, setLastMoveError] = useState<string | null>(null);
+
+	const conflicts = useMemo(() => getGridConflicts(grid), [grid]);
 
 	const allowInvalidMovesRef = useRef(allowInvalidMoves);
 	useEffect(() => {
@@ -29,14 +30,14 @@ export function useGrid(initialGrid: Grid, allowInvalidMoves: boolean) {
 			setGrid((grid) => {
 				const moveResult = isValidMove(grid, rowIndex, colIndex, value);
 
-				if (!moveResult.valid && moveResult.error) {
-					setMoveError(moveResult.error);
+				if (!moveResult.valid && moveResult.message) {
+					setLastMoveError(moveResult.message);
 
 					if (!allowInvalidMovesRef.current) {
 						return grid;
 					}
 				} else {
-					setMoveError(null);
+					setLastMoveError(null);
 				}
 
 				const newGrid = [...grid];
@@ -75,5 +76,5 @@ export function useGrid(initialGrid: Grid, allowInvalidMoves: boolean) {
 		[],
 	);
 
-	return { grid, moveError, updateCell, toggleCandidate };
+	return { grid, lastMoveError, conflicts, updateCell, toggleCandidate };
 }

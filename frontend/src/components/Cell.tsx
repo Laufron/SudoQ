@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { memo, useCallback } from "react";
 import { parseCellValue } from "../lib/grid";
-import type { Cell, Digit } from "../types/grid";
+import type { Cell, CellValue, Digit } from "../types/grid";
 import type { ToggleCandidateOptions, UpdateCellOptions } from "../hooks/grid";
 
 type CellProps = {
@@ -35,12 +35,24 @@ export const CellComponent = memo(function CellComponent({
 		},
 		[row, col, setInputRef],
 	);
+
+	const handleValueChange = (value: CellValue) => {
+		if (cell.isInitialValue) return;
+		if (cell.value === value) return;
+		updateCell({
+			rowIndex: row,
+			colIndex: col,
+			value,
+		});
+	};
+
+	console.log("render", row, col);
 	return (
 		<div
 			className={clsx(
 				"relative flex aspect-square items-center justify-center border border-(--border) text-(--text)",
 				"has-focus:border-(--accent-border) has-focus:border-4",
-				isConflicting && "bg-(--accent)/30",
+				isConflicting && "bg-(--accent)/20",
 				(row === 2 || row === 5) && "border-b-4",
 				(col === 2 || col === 5) && "border-r-4",
 				col === 0 && "border-l-0",
@@ -71,11 +83,7 @@ export const CellComponent = memo(function CellComponent({
 				onChange={(e) => {
 					const value = parseCellValue(e.target.value);
 					if (value !== undefined) {
-						updateCell({
-							rowIndex: row,
-							colIndex: col,
-							value: value,
-						});
+						handleValueChange(value);
 					}
 				}}
 				className={clsx(
@@ -84,16 +92,26 @@ export const CellComponent = memo(function CellComponent({
 					isConflicting && "text-(--accent)",
 				)}
 				onKeyDown={(e) => {
-					// Only triggered when input is focused
 					if (e.ctrlKey && /^[1-9]$/.test(e.key)) {
 						e.preventDefault();
-						if (!cell.isInitialValue)
+
+						if (!cell.isInitialValue && cell.value === null) {
 							toggleCandidate({
 								rowIndex: row,
 								colIndex: col,
 								candidate: Number(e.key) as Digit,
 							});
+						}
+						return;
 					}
+
+					if (/^[1-9]$/.test(e.key) && !cell.isInitialValue) {
+						e.preventDefault();
+
+						handleValueChange(Number(e.key) as Digit);
+						return;
+					}
+
 					switch (e.key) {
 						case "ArrowUp":
 							focusCell(row - 1, col);
@@ -117,6 +135,7 @@ export const CellComponent = memo(function CellComponent({
 							if (e.ctrlKey && /^[1-9]$/.test(e.key)) {
 								// toggle candidate
 							}
+							break;
 					}
 				}}
 			/>

@@ -34,10 +34,8 @@ function App() {
 		checkBackend();
 	}, []);
 
-	const { grid, moveError, updateCell, toggleCandidate } = useGrid(
-		INITIAL_GRID,
-		allowInvalidMoves,
-	);
+	const { grid, lastMoveError, conflicts, updateCell, toggleCandidate } =
+		useGrid(INITIAL_GRID, allowInvalidMoves);
 
 	const inputRefs = useRef<(HTMLInputElement | null)[][]>(
 		Array.from({ length: 9 }, () => Array(9).fill(null)),
@@ -51,6 +49,7 @@ function App() {
 	const focusCell = useCallback((row: number, col: number) => {
 		inputRefs.current[row]?.[col]?.focus();
 	}, []);
+
 	return (
 		<section className="px-8">
 			<h1>SudoQ</h1>
@@ -67,7 +66,7 @@ function App() {
 									cell={cell}
 									isConflicting={
 										(showInvalidMoves &&
-											moveError?.cells.some(
+											conflicts.some(
 												(cell) =>
 													cell.rowIndex === rowIndex &&
 													cell.colIndex === colIndex,
@@ -82,10 +81,8 @@ function App() {
 							)),
 						)}
 					</div>
-					{moveError && showInvalidMoves && (
-						<p className="text-red-700">
-							{moveError.message}, les cellules en conflit ont été surlignées
-						</p>
+					{lastMoveError && showInvalidMoves && (
+						<p className="text-red-700">{lastMoveError}</p>
 					)}
 				</div>
 				<aside className="w-full max-w-56 border-(--border) pt-8">

@@ -1,6 +1,12 @@
-import type { Cell, CellValue, Grid, PositionedCell } from "../types/grid";
-import { HasDuplicates } from "./utils";
-import type { MoveError, MoveResult } from "../types/rules";
+import type {
+	Cell,
+	CellPosition,
+	CellValue,
+	Digit,
+	Grid,
+	PositionedCell,
+} from "../types/grid";
+import type { MoveResult } from "../types/rules";
 
 export function getRow(grid: Grid, rowIndex: number): PositionedCell[] {
 	return grid[rowIndex].map((cell, colIndex) => ({ cell, rowIndex, colIndex }));
@@ -30,81 +36,38 @@ export function getBlock(
 	);
 }
 
-export function isGroupValid(group: Cell[]): boolean {
-	return !HasDuplicates(
-		group.map((cell) => cell.value).filter((value) => value !== null),
-	);
-}
+// Not used yet
 
-export function isValidGridShape(grid: Grid): boolean {
-	return grid.length === 9 && grid.every((row) => row.length === 9);
-}
+// function isValidGridShape(grid: Grid): boolean {
+// 	return grid.length === 9 && grid.every((row) => row.length === 9);
+// }
 
-export function isGridValid(grid: Grid): boolean {
-	for (let index = 0; index < grid.length; index++) {
-		if (!isGroupValid(getRow(grid, index).map((pCell) => pCell.cell)))
-			return false;
-		if (!isGroupValid(getCol(grid, index).map((pCell) => pCell.cell)))
-			return false;
-	}
+// function isGroupValid(group: Cell[]): boolean {
+// 	return !HasDuplicates(
+// 		group.map((cell) => cell.value).filter((value) => value !== null),
+// 	);
+// }
 
-	for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 3) {
-		for (let colIndex = 0; colIndex < grid.length; colIndex += 3) {
-			if (
-				!isGroupValid(
-					getBlock(grid, rowIndex, colIndex).map((pCell) => pCell.cell),
-				)
-			)
-				return false;
-		}
-	}
-	return true;
-}
-function getConflictingCells(
-	group: PositionedCell[],
-	rowIndex: number,
-	colIndex: number,
-	value: CellValue,
-): PositionedCell[] {
-	if (value === null) return [];
+// function isGridValid(grid: Grid): boolean {
+// 	for (let index = 0; index < grid.length; index++) {
+// 		if (!isGroupValid(getRow(grid, index).map((pCell) => pCell.cell)))
+// 			return false;
+// 		if (!isGroupValid(getCol(grid, index).map((pCell) => pCell.cell)))
+// 			return false;
+// 	}
 
-	return group
-		.filter(
-			(pCell) => pCell.rowIndex !== rowIndex || pCell.colIndex !== colIndex,
-		)
-		.filter((pCell) => pCell.cell.value === value);
-}
-
-function validateGroup(
-	group: PositionedCell[],
-	rowIndex: number,
-	colIndex: number,
-	value: CellValue,
-	message: MoveError["message"],
-): MoveResult {
-	const conflictingCells = getConflictingCells(
-		group,
-		rowIndex,
-		colIndex,
-		value,
-	);
-
-	if (conflictingCells.length === 0) return { valid: true };
-
-	return {
-		valid: false,
-		error: {
-			message,
-			cells: [
-				...conflictingCells.map(({ rowIndex, colIndex }) => ({
-					rowIndex,
-					colIndex,
-				})),
-				{ rowIndex, colIndex },
-			],
-		},
-	};
-}
+// 	for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 3) {
+// 		for (let colIndex = 0; colIndex < grid.length; colIndex += 3) {
+// 			if (
+// 				!isGroupValid(
+// 					getBlock(grid, rowIndex, colIndex).map((pCell) => pCell.cell),
+// 				)
+// 			)
+// 				return false;
+// 		}
+// 	}
+// 	return true;
+// }
 
 export function isValidMove(
 	grid: Grid,
@@ -116,18 +79,64 @@ export function isValidMove(
 
 	const groups = [
 		{
-			cells: getBlock(grid, rowIndex, colIndex),
+			group: getBlock(grid, rowIndex, colIndex),
 			message: "Bloc invalide" as const,
 		},
-		{ cells: getRow(grid, rowIndex), message: "Ligne invalide" as const },
-		{ cells: getCol(grid, colIndex), message: "Colonne invalide" as const },
+		{ group: getRow(grid, rowIndex), message: "Ligne invalide" as const },
+		{ group: getCol(grid, colIndex), message: "Colonne invalide" as const },
 	];
 
-	for (const { cells, message } of groups) {
-		const result = validateGroup(cells, rowIndex, colIndex, value, message);
+	function canInsertValueInGroup(group: Cell[], value: CellValue): boolean {
+		if (value === null) return true;
 
-		if (!result.valid) return result;
+		return !group.some((cell) => cell.value === value);
+	}
+
+	for (const { group, message } of groups) {
+		const validMove = canInsertValueInGroup(
+			group.map((pCell) => pCell.cell),
+			value,
+		);
+
+		if (!validMove) return { valid: false, message };
 	}
 
 	return { valid: true };
+}
+
+function getGroupConflicts(group: PositionedCell[]): PositionedCell[] {
+	const values = new Map<Digit, PositionedCell[]>();
+
+	for (const pCell of group) {
+		if (pCell.cell.value === null) continue;
+
+		const cells = values.get(pCell.cell.value) ?? [];
+		cells.push(pCell);
+		values.set(pCell.cell.value, cells);
+	}
+
+	return [...values.values()].filter((cells) => cells.length > 1).flat();
+}
+
+export function getGridConflicts(grid: Grid): CellPosition[] {
+	const conflicts = new Set<CellPosition>([]);
+
+	const addConflicts = (group: PositionedCell[]) => {
+		for (const { rowIndex, colIndex } of getGroupConflicts(group)) {
+			conflicts.add({ rowIndex, colIndex });
+		}
+	};
+
+	for (let index = 0; index < grid.length; index++) {
+		addConflicts(getRow(grid, index));
+		addConflicts(getCol(grid, index));
+	}
+
+	for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 3) {
+		for (let colIndex = 0; colIndex < grid.length; colIndex += 3) {
+			addConflicts(getBlock(grid, rowIndex, colIndex));
+		}
+	}
+
+	return [...conflicts];
 }
